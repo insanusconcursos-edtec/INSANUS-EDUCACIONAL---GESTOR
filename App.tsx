@@ -13,7 +13,6 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
-  ChevronLeft,
   Clock,
   Video,
   Save,
@@ -30,10 +29,8 @@ import {
   DollarSign,
   Phone,
   Mail,
-  Briefcase,
   Home,
   Edit,
-  Upload,
   Camera,
   ZoomIn,
   Move,
@@ -57,10 +54,8 @@ import {
   CourseCategory,
   DayOfWeek,
   PresentialConfig,
-  PresentialClassSession,
-  Shift
+  PresentialClassSession
 } from './types';
-import { MOCK_TEACHERS } from './constants'; 
 
 // Firebase Imports
 import { db, storage } from './firebase';

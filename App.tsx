@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -33,9 +33,8 @@ import {
   Edit,
   Camera,
   ZoomIn,
-  Move,
-  Check,
   RotateCcw,
+  Check,
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
@@ -73,6 +72,8 @@ import {
   getDownloadURL 
 } from 'firebase/storage';
 
+import { INITIAL_PRESENTIAL_CONFIG, HOLIDAYS, INITIAL_TEACHER_FORM } from './constants';
+
 // --- HELPERS ---
 
 const formatCurrency = (val: number) => {
@@ -84,72 +85,20 @@ const formatWhatsAppLink = (phone: string) => {
   return `https://wa.me/55${clean}`;
 };
 
-// Simple Holiday List (YYYY-MM-DD)
-const HOLIDAYS = [
-    '2024-01-01', '2024-02-13', '2024-03-29', '2024-04-21', 
-    '2024-05-01', '2024-05-30', '2024-09-07', '2024-10-12', 
-    '2024-11-02', '2024-11-15', '2024-12-25',
-    '2025-01-01', '2025-04-18', '2025-04-21', '2025-05-01'
-];
-
-const INITIAL_PRESENTIAL_CONFIG: PresentialConfig = {
-  location: 'RIO_BRANCO',
-  subType: 'PRE_EDITAL',
-  modality: 'REGULAR',
-  hasClassroomRecording: false,
-  totalMeetings: 60,
-  meetingDurationHours: 3,
-  classesPerMeeting: 2,
-  breakCount: 1,
-  breakDurationMinutes: 15,
-  shift: 'NOITE',
-  startTime: '19:00',
-  daysOfWeek: ['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA'],
-  allowWeekend: false,
-  startDate: new Date().toISOString().split('T')[0],
-  skipRedHolidays: true,
-  hourlyRate: 50,
-  commissionRecording: 10,
-  commissionSubstitution: 10,
-  commissionWeekend: 20
-};
-
-const INITIAL_TEACHER_FORM: Omit<Teacher, 'id'> = {
-  name: '',
-  email: '',
-  whatsapp: '',
-  segment: 'CONCURSO',
-  location: 'RIO_BRANCO',
-  subjects: [],
-  primarySubject: '',
-  isPublicServant: false,
-  isShiftWorker: false,
-  weekendAvailability: { saturday: false, sunday: false },
-  preferences: {
-    concurso: [null, null, null],
-    enem: [null, null, null]
-  }
-};
-
 // --- COMPONENTS ---
 
-// 0. Avatar Editor (Robust Version)
+// 0. Avatar Editor
 const AvatarEditor = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCancel: () => void, onSave: (blob: Blob) => void }) => {
-    // Zoom control (multiplier over base fit)
     const [userZoom, setUserZoom] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
-    
-    // Image State
-    const [baseScale, setBaseScale] = useState(1); // Scale to fit image in box initially
+    const [baseScale, setBaseScale] = useState(1); 
     const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
-    
-    // Dragging
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     
     const imageRef = useRef<HTMLImageElement>(null);
-    const EDITOR_SIZE = 280; // Visual box size
-    const OUTPUT_SIZE = 400; // Final image resolution
+    const EDITOR_SIZE = 280; 
+    const OUTPUT_SIZE = 400; 
 
     const handleMouseDown = (e: React.MouseEvent) => {
         setIsDragging(true);
@@ -172,16 +121,9 @@ const AvatarEditor = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCanc
         const nW = img.naturalWidth;
         const nH = img.naturalHeight;
         setNaturalSize({ w: nW, h: nH });
-
-        // Calculate scale to fit image completely inside EDITOR_SIZE (like object-fit: contain)
-        // We use the smallest ratio to ensure it fits
         const scaleW = EDITOR_SIZE / nW;
         const scaleH = EDITOR_SIZE / nH;
-        // We actually want 'cover' behavior usually for avatars, or at least a good start.
-        // Let's create a base scale where the smallest dimension fits the box (object-fit: cover equivalent)
-        // So the user starts with a filled circle.
         const scale = Math.max(scaleW, scaleH); 
-        
         setBaseScale(scale);
         setUserZoom(1);
         setPosition({ x: 0, y: 0 });
@@ -195,28 +137,13 @@ const AvatarEditor = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCanc
         canvas.width = OUTPUT_SIZE;
         canvas.height = OUTPUT_SIZE;
 
-        // 1. Background
         ctx.fillStyle = '#121212';
         ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
-
-        // 2. Transformations
-        // We need to map the visual coordinate system (280px) to the canvas (400px)
         const ratio = OUTPUT_SIZE / EDITOR_SIZE;
-
-        // Move to Center of Canvas
         ctx.translate(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2);
-
-        // Apply Translation (Visual delta * Ratio to match resolution)
         ctx.translate(position.x * ratio, position.y * ratio);
-
-        // Apply Scale
-        // The visual image is scaled by (baseScale * userZoom).
-        // Since ctx.drawImage draws the *natural* size pixels, we apply that same factor,
-        // multiplied by the output/input ratio.
         const totalScale = baseScale * userZoom * ratio;
         ctx.scale(totalScale, totalScale);
-
-        // 3. Draw Image (Centered at Origin)
         ctx.drawImage(imageRef.current, -naturalSize.w / 2, -naturalSize.h / 2);
 
         canvas.toBlob((blob) => {
@@ -228,8 +155,6 @@ const AvatarEditor = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCanc
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
             <div className="bg-insanus-panel border border-gray-700 rounded-xl p-6 w-full max-w-sm flex flex-col items-center shadow-2xl">
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><Edit size={20}/> Ajustar Foto</h3>
-                
-                {/* Visual Editor Box */}
                 <div 
                     className="relative overflow-hidden bg-black border-2 border-dashed border-gray-700 cursor-move touch-none select-none rounded-lg"
                     style={{ width: EDITOR_SIZE, height: EDITOR_SIZE }}
@@ -238,7 +163,6 @@ const AvatarEditor = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCanc
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                 >
-                    {/* Image Layer - Centered by flex, then transformed */}
                     <div className="w-full h-full flex items-center justify-center overflow-visible">
                         <img 
                             ref={imageRef}
@@ -247,33 +171,20 @@ const AvatarEditor = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCanc
                             onLoad={onImgLoad}
                             draggable={false}
                             style={{ 
-                                // Reset default constraints
                                 maxWidth: 'none', 
                                 maxHeight: 'none',
-                                // Apply Transforms
-                                // 1. Translate (Move)
-                                // 2. Scale (Base fit * User zoom)
                                 transform: `translate(${position.x}px, ${position.y}px) scale(${baseScale * userZoom})`,
                                 transformOrigin: 'center center',
                                 transition: isDragging ? 'none' : 'transform 0.1s ease-out'
                             }}
                         />
                     </div>
-
-                    {/* Mask Overlay (Darkness outside circle) */}
-                    <div className="absolute inset-0 pointer-events-none" 
-                         style={{ 
-                             background: 'radial-gradient(circle, transparent 48%, rgba(0,0,0,0.85) 50%)' 
-                         }}>
-                    </div>
-                    
-                    {/* Circle Guide */}
+                    <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle, transparent 48%, rgba(0,0,0,0.85) 50%)' }}></div>
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                          <div className="w-[96%] h-[96%] rounded-full border-2 border-insanus-red opacity-60 shadow-[0_0_15px_rgba(220,38,38,0.4)]"></div>
                     </div>
                 </div>
 
-                {/* Controls */}
                 <div className="w-full mt-6 space-y-4">
                     <div className="flex items-center gap-4">
                         <ZoomIn size={20} className="text-gray-400"/>
@@ -286,27 +197,15 @@ const AvatarEditor = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCanc
                             onChange={(e) => setUserZoom(parseFloat(e.target.value))}
                             className="flex-1 accent-insanus-red h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                         />
-                        <button 
-                            onClick={() => { setUserZoom(1); setPosition({x:0, y:0}); }}
-                            className="p-2 text-gray-400 hover:text-white bg-gray-800 rounded-lg"
-                            title="Resetar"
-                        >
+                        <button onClick={() => { setUserZoom(1); setPosition({x:0, y:0}); }} className="p-2 text-gray-400 hover:text-white bg-gray-800 rounded-lg">
                             <RotateCcw size={16} />
                         </button>
                     </div>
-                    <p className="text-xs text-gray-500 text-center flex items-center justify-center gap-2">
-                        <Move size={12}/> Arraste para mover • Zoom para ajustar
-                    </p>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3 w-full mt-6">
-                    <button onClick={onCancel} className="flex-1 py-3 text-gray-400 font-bold hover:bg-gray-800 rounded-lg transition-colors">
-                        Cancelar
-                    </button>
-                    <button onClick={handleSave} className="flex-1 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2 transition-colors">
-                        <Check size={18}/> Confirmar
-                    </button>
+                    <button onClick={onCancel} className="flex-1 py-3 text-gray-400 font-bold hover:bg-gray-800 rounded-lg transition-colors">Cancelar</button>
+                    <button onClick={handleSave} className="flex-1 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2 transition-colors"><Check size={18}/> Confirmar</button>
                 </div>
             </div>
         </div>
@@ -353,9 +252,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
       </nav>
       <div className="p-4 border-t border-insanus-panel">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-insanus-red flex items-center justify-center font-bold text-white">
-            A
-          </div>
+          <div className="w-8 h-8 rounded-full bg-insanus-red flex items-center justify-center font-bold text-white">A</div>
           <div>
             <p className="text-sm font-medium text-white">Administrador</p>
             <p className="text-xs text-insanus-gray">Sessão Ativa</p>
@@ -478,7 +375,7 @@ const FileManager = ({ files, onSelectFile }: { files: FileNode[], onSelectFile?
   );
 };
 
-// 3. Presential Course Detail View
+// 3. Presential Course Detail View (WITH ACCORDION & EDIT MODAL)
 interface PresentialDetailProps {
   course: Course;
   onUpdate: (c: Course) => Promise<void>;
@@ -490,13 +387,13 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
     const [activeTab, setActiveTab] = useState<'EDITAL' | 'CALENDARIO' | 'FINANCEIRO'>('EDITAL');
     const [localCourse, setLocalCourse] = useState(course);
     const [expandedDisciplines, setExpandedDisciplines] = useState<string[]>([]);
+    const [expandedTopics, setExpandedTopics] = useState<string[]>([]);
     const [saving, setSaving] = useState(false);
     const [generatingSchedule, setGeneratingSchedule] = useState(false);
+    const [isEditInfoModalOpen, setIsEditInfoModalOpen] = useState(false);
     
-    // Config values helper
     const cfg = localCourse.presentialConfig || INITIAL_PRESENTIAL_CONFIG;
 
-    // --- NEW ITEM MODAL STATE (Replaces Prompt) ---
     const [newItemModal, setNewItemModal] = useState<{
         open: boolean;
         mode: 'ADD' | 'EDIT';
@@ -524,7 +421,6 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
         }
     };
 
-    // --- AUTOMATIC SCHEDULE GENERATOR ---
     const generateSchedule = async () => {
         if(!confirm("Isso irá sobrescrever a grade atual. Deseja continuar?")) return;
         setGeneratingSchedule(true);
@@ -563,7 +459,6 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
 
         let meetingCount = 0;
         let queueIndex = 0;
-
         const maxIterations = 365; 
         let iterations = 0;
 
@@ -572,20 +467,16 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
             const dateStr = currentDate.toISOString().split('T')[0];
             
             let isDayAllowed = allowedDays.includes(dayOfWeek);
-            
             const isHoliday = HOLIDAYS.includes(dateStr);
-            if (cfg.skipRedHolidays && isHoliday) {
-                isDayAllowed = false;
-            }
+            if (cfg.skipRedHolidays && isHoliday) isDayAllowed = false;
 
             if (isDayAllowed) {
                 meetingCount++;
-                
                 for (let slot = 0; slot < cfg.classesPerMeeting; slot++) {
                     if (queueIndex < classQueue.length) {
                         const item = classQueue[queueIndex];
                         newSchedule.push({
-                            id: Date.now() + Math.random().toString(), // Temp ID
+                            id: Date.now() + Math.random().toString(), 
                             date: dateStr,
                             dayOfWeek: Object.keys(dayMap).find(key => dayMap[key] === dayOfWeek) as DayOfWeek,
                             meetingNumber: meetingCount,
@@ -602,7 +493,6 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                     }
                 }
             }
-
             currentDate.setDate(currentDate.getDate() + 1);
             iterations++;
         }
@@ -616,7 +506,6 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
     const { consumedMeetings, totalModulesSelected, costAdditional } = useMemo(() => {
         let slotsUsed = 0;
         let modulesCount = 0;
-        
         localCourse.disciplines.forEach(d => {
             d.topics.forEach(t => {
                 t.modules.forEach(m => {
@@ -627,28 +516,21 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                 });
             });
         });
-
         const meetingsNeeded = Math.ceil(slotsUsed / cfg.classesPerMeeting);
-        
         let additional = 0;
         if (meetingsNeeded > cfg.totalMeetings) {
             const extraMeetings = meetingsNeeded - cfg.totalMeetings;
             const extraHours = extraMeetings * cfg.meetingDurationHours;
             additional = extraHours * cfg.hourlyRate;
-            if(cfg.hasClassroomRecording) {
-                additional *= (1 + (cfg.commissionRecording / 100));
-            }
+            if(cfg.hasClassroomRecording) additional *= (1 + (cfg.commissionRecording / 100));
         }
-
         return { consumedMeetings: meetingsNeeded, totalModulesSelected: modulesCount, costAdditional: additional };
     }, [localCourse, cfg]);
 
     const projectedCost = useMemo(() => {
         const totalHours = cfg.totalMeetings * cfg.meetingDurationHours;
         let baseCost = totalHours * cfg.hourlyRate;
-        if (cfg.hasClassroomRecording) {
-            baseCost += baseCost * (cfg.commissionRecording / 100);
-        }
+        if (cfg.hasClassroomRecording) baseCost += baseCost * (cfg.commissionRecording / 100);
         return baseCost + costAdditional;
     }, [cfg, costAdditional]);
 
@@ -656,9 +538,8 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
         const d = localCourse.disciplines.find(x => x.id === dId);
         let mName = 'Módulo';
         let dColor = d?.color || '#333';
-        let tName = '';
         let dName = d?.name || '';
-        
+        let tName = '';
         if(d) {
             for(const t of d.topics) {
                 const m = t.modules.find(mod => mod.id === mId);
@@ -672,9 +553,7 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
         return { mName, tName, dName, dColor };
     };
 
-    const getTeacherInfo = (tId: string) => {
-        return teachers.find(t => t.id === tId);
-    };
+    const getTeacherInfo = (tId: string) => teachers.find(t => t.id === tId);
 
     const scheduleByMeeting = useMemo(() => {
         if (!localCourse.presentialSchedule) return [];
@@ -690,20 +569,35 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
         setExpandedDisciplines(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
 
-    // --- REPLACED PROMPT HANDLERS ---
+    const toggleTopic = (id: string) => {
+        setExpandedTopics(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    };
+
+    // --- DIALOGS ---
     const openAddDiscipline = () => setNewItemModal({ open: true, mode: 'ADD', type: 'DISCIPLINE', value: '' });
     const openAddTopic = (dId: string) => setNewItemModal({ open: true, mode: 'ADD', type: 'TOPIC', dId, value: '' });
     const openAddModule = (dId: string, tId: string) => setNewItemModal({ open: true, mode: 'ADD', type: 'MODULE', dId, tId, value: '' });
-
+    
     const openEditTopic = (dId: string, tId: string, currentName: string) => {
-        setNewItemModal({
-            open: true,
-            mode: 'EDIT',
-            type: 'TOPIC',
-            dId,
-            itemId: tId,
-            value: currentName
-        });
+        setNewItemModal({ open: true, mode: 'EDIT', type: 'TOPIC', dId, itemId: tId, value: currentName });
+    };
+
+    const openEditModule = (dId: string, tId: string, mId: string, currentName: string) => {
+        setNewItemModal({ open: true, mode: 'EDIT', type: 'MODULE', dId, tId, itemId: mId, value: currentName });
+    };
+
+    const deleteModule = async (dId: string, tId: string, mId: string) => {
+        if(!confirm("Tem certeza que deseja excluir este módulo?")) return;
+        setLocalCourse(prev => ({
+            ...prev,
+            disciplines: prev.disciplines.map(d => d.id === dId ? {
+                ...d,
+                topics: d.topics.map(t => t.id === tId ? {
+                    ...t,
+                    modules: t.modules.filter(m => m.id !== mId)
+                } : t)
+            } : d)
+        }));
     };
 
     const handleConfirmAddItem = () => {
@@ -715,6 +609,7 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                  setLocalCourse(prev => ({...prev, disciplines: [...prev.disciplines, newD]}));
             } else if (newItemModal.type === 'TOPIC' && newItemModal.dId) {
                  const newT: CourseTopic = { id: Date.now().toString(), name: newItemModal.value, modules: [] };
+                 setExpandedTopics(prev => [...prev, newT.id]);
                  setLocalCourse(prev => ({
                     ...prev,
                     disciplines: prev.disciplines.map(d => d.id === newItemModal.dId ? {...d, topics: [...d.topics, newT]} : d)
@@ -737,14 +632,27 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                     } : d)
                 }));
             }
-        } else if (newItemModal.mode === 'EDIT' && newItemModal.type === 'TOPIC' && newItemModal.dId && newItemModal.itemId) {
-            setLocalCourse(prev => ({
-                ...prev,
-                disciplines: prev.disciplines.map(d => d.id === newItemModal.dId ? {
-                    ...d,
-                    topics: d.topics.map(t => t.id === newItemModal.itemId ? { ...t, name: newItemModal.value } : t)
-                } : d)
-            }));
+        } else if (newItemModal.mode === 'EDIT') {
+            if (newItemModal.type === 'TOPIC' && newItemModal.dId && newItemModal.itemId) {
+                setLocalCourse(prev => ({
+                    ...prev,
+                    disciplines: prev.disciplines.map(d => d.id === newItemModal.dId ? {
+                        ...d,
+                        topics: d.topics.map(t => t.id === newItemModal.itemId ? { ...t, name: newItemModal.value } : t)
+                    } : d)
+                }));
+            } else if (newItemModal.type === 'MODULE' && newItemModal.dId && newItemModal.tId && newItemModal.itemId) {
+                setLocalCourse(prev => ({
+                    ...prev,
+                    disciplines: prev.disciplines.map(d => d.id === newItemModal.dId ? {
+                        ...d,
+                        topics: d.topics.map(t => t.id === newItemModal.tId ? {
+                            ...t,
+                            modules: t.modules.map(m => m.id === newItemModal.itemId ? { ...m, name: newItemModal.value } : m)
+                        } : t)
+                    } : d)
+                }));
+            }
         }
 
         setNewItemModal({ ...newItemModal, open: false });
@@ -786,6 +694,13 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
         }));
     };
 
+    const updateLocalConfig = (key: keyof PresentialConfig, value: any) => {
+        setLocalCourse(prev => ({
+            ...prev,
+            presentialConfig: { ...prev.presentialConfig!, [key]: value }
+        }));
+    };
+
     return (
         <div className="h-full flex flex-col bg-insanus-black">
              {/* Header */}
@@ -793,8 +708,11 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="p-2 hover:bg-gray-800 rounded-full text-white"><ArrowLeft /></button>
                     <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 group">
                             <h2 className="text-2xl font-bold text-white">{localCourse.name}</h2>
+                            <button onClick={() => setIsEditInfoModalOpen(true)} className="text-gray-500 hover:text-white transition-colors" title="Editar Informações da Turma">
+                                <Edit size={16} />
+                            </button>
                             <span className="bg-green-900 text-green-400 text-xs px-2 py-0.5 rounded border border-green-700">PRESENCIAL</span>
                         </div>
                         <div className="flex gap-4 text-xs text-gray-400 mt-1">
@@ -877,72 +795,101 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                                 {expandedDisciplines.includes(d.id) && (
                                     <div className="p-4 space-y-4">
                                         {d.topics.map((t, tIndex) => (
-                                            <div key={t.id} className="pl-4 border-l-2 border-gray-800">
-                                                <div className="flex items-center justify-between mb-2 group">
+                                            <div key={t.id} className="border border-gray-800 rounded-lg overflow-hidden bg-black/20">
+                                                {/* Header do Tópico (Acordeão) */}
+                                                <div 
+                                                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/5 transition-colors group"
+                                                    onClick={() => toggleTopic(t.id)}
+                                                >
                                                     <div className="flex items-center gap-2">
-                                                        <h4 className="font-medium text-gray-200">{t.name}</h4>
-                                                        <button 
-                                                            onClick={() => openEditTopic(d.id, t.id, t.name)}
-                                                            className="text-gray-500 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            title="Editar Nome"
-                                                        >
-                                                            <Edit size={14} />
-                                                        </button>
-                                                        <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {expandedTopics.includes(t.id) ? <ChevronDown size={16} className="text-gray-400"/> : <ChevronRight size={16} className="text-gray-400"/>}
+                                                        <h4 className="font-bold text-gray-200">{t.name}</h4>
+                                                        <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                                                             {tIndex > 0 && (
-                                                                <button onClick={() => handleMoveTopic(d.id, t.id, 'UP')} className="text-gray-500 hover:text-white" title="Mover para cima">
+                                                                <button onClick={(e) => { e.stopPropagation(); handleMoveTopic(d.id, t.id, 'UP') }} className="text-gray-500 hover:text-white" title="Mover para cima">
                                                                     <ArrowUp size={12} />
                                                                 </button>
                                                             )}
                                                             {tIndex < d.topics.length - 1 && (
-                                                                <button onClick={() => handleMoveTopic(d.id, t.id, 'DOWN')} className="text-gray-500 hover:text-white" title="Mover para baixo">
+                                                                <button onClick={(e) => { e.stopPropagation(); handleMoveTopic(d.id, t.id, 'DOWN') }} className="text-gray-500 hover:text-white" title="Mover para baixo">
                                                                     <ArrowDown size={12} />
                                                                 </button>
                                                             )}
                                                         </div>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); openEditTopic(d.id, t.id, t.name) }}
+                                                            className="text-gray-500 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                                                            title="Editar Nome"
+                                                        >
+                                                            <Edit size={12} />
+                                                        </button>
                                                     </div>
-                                                    <button onClick={() => openAddModule(d.id, t.id)} className="text-insanus-red text-xs hover:underline">+ Módulo</button>
+                                                    <button onClick={(e) => { e.stopPropagation(); openAddModule(d.id, t.id) }} className="text-insanus-red text-xs hover:underline">+ Módulo</button>
                                                 </div>
 
-                                                <div className="space-y-2">
-                                                    {t.modules.map(m => (
-                                                        <div key={m.id} className={`p-3 rounded border flex items-center justify-between transition-colors ${m.isSelectedForPresential ? 'bg-blue-900/20 border-blue-500/50' : 'bg-black/40 border-gray-800'}`}>
-                                                            <div className="flex items-center gap-3">
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={m.isSelectedForPresential || false}
-                                                                    onChange={(e) => updateModule(d.id, t.id, m.id, { isSelectedForPresential: e.target.checked })}
-                                                                    className="w-5 h-5 accent-insanus-red rounded cursor-pointer"
-                                                                />
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-white">{m.name}</p>
-                                                                    <div className="flex items-center gap-2 mt-1">
-                                                                        <label className="text-[10px] text-gray-400">Qtd. Aulas:</label>
-                                                                        <input 
-                                                                            type="number" 
-                                                                            min="1"
-                                                                            className="bg-black border border-gray-700 rounded w-12 text-center text-xs text-white"
-                                                                            value={m.requiredClasses}
-                                                                            onChange={(e) => updateModule(d.id, t.id, m.id, { requiredClasses: parseInt(e.target.value) || 1 })}
-                                                                        />
-                                                                        <span className="text-[10px] text-gray-500">(1 Aula = {((cfg.meetingDurationHours * 60) / cfg.classesPerMeeting)}min)</span>
+                                                {/* Conteúdo do Tópico (Módulos) */}
+                                                {expandedTopics.includes(t.id) && (
+                                                    <div className="p-3 bg-black/40 border-t border-gray-800 space-y-2">
+                                                        {t.modules.length === 0 && (
+                                                            <p className="text-center text-xs text-gray-600 italic">Nenhum módulo cadastrado neste assunto.</p>
+                                                        )}
+                                                        {t.modules.map(m => (
+                                                            <div key={m.id} className={`group p-3 rounded border flex items-center justify-between transition-colors ${m.isSelectedForPresential ? 'bg-blue-900/20 border-blue-500/50' : 'bg-black/60 border-gray-800'}`}>
+                                                                <div className="flex items-center gap-3">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={m.isSelectedForPresential || false}
+                                                                        onChange={(e) => updateModule(d.id, t.id, m.id, { isSelectedForPresential: e.target.checked })}
+                                                                        className="w-5 h-5 accent-insanus-red rounded cursor-pointer"
+                                                                    />
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <p className="text-sm font-bold text-white">{m.name}</p>
+                                                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <button 
+                                                                                    onClick={() => openEditModule(d.id, t.id, m.id, m.name)}
+                                                                                    className="text-gray-500 hover:text-blue-400"
+                                                                                    title="Editar Módulo"
+                                                                                >
+                                                                                    <Edit size={12} />
+                                                                                </button>
+                                                                                <button 
+                                                                                    onClick={() => deleteModule(d.id, t.id, m.id)}
+                                                                                    className="text-gray-500 hover:text-red-500"
+                                                                                    title="Excluir Módulo"
+                                                                                >
+                                                                                    <Trash2 size={12} />
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <label className="text-[10px] text-gray-400">Qtd. Aulas:</label>
+                                                                            <input 
+                                                                                type="number" 
+                                                                                min="1"
+                                                                                className="bg-black border border-gray-700 rounded w-12 text-center text-xs text-white"
+                                                                                value={m.requiredClasses}
+                                                                                onChange={(e) => updateModule(d.id, t.id, m.id, { requiredClasses: parseInt(e.target.value) || 1 })}
+                                                                            />
+                                                                            <span className="text-[10px] text-gray-500">(1 Aula = {((cfg.meetingDurationHours * 60) / cfg.classesPerMeeting)}min)</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
+                                                                
+                                                                <div className="flex items-center gap-2">
+                                                                    <select 
+                                                                        className="bg-black border border-gray-700 text-xs text-gray-400 rounded p-1 w-32"
+                                                                        value={m.presentialTeacherId || ''}
+                                                                        onChange={(e) => updateModule(d.id, t.id, m.id, { presentialTeacherId: e.target.value })}
+                                                                    >
+                                                                        <option value="">Professor...</option>
+                                                                        {teachers.map(tr => <option key={tr.id} value={tr.id}>{tr.name}</option>)}
+                                                                    </select>
+                                                                </div>
                                                             </div>
-                                                            
-                                                            <div className="flex items-center gap-2">
-                                                                <select 
-                                                                    className="bg-black border border-gray-700 text-xs text-gray-400 rounded p-1 w-32"
-                                                                    value={m.presentialTeacherId || ''}
-                                                                    onChange={(e) => updateModule(d.id, t.id, m.id, { presentialTeacherId: e.target.value })}
-                                                                >
-                                                                    <option value="">Professor...</option>
-                                                                    {teachers.map(tr => <option key={tr.id} value={tr.id}>{tr.name}</option>)}
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -1027,7 +974,6 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                 {activeTab === 'FINANCEIRO' && (
                     <div className="space-y-6">
                         <h3 className="text-xl font-bold text-white mb-4">Planejamento Financeiro da Turma</h3>
-                        
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-insanus-panel p-6 rounded-xl border border-gray-800">
                                 <p className="text-sm text-gray-400 uppercase font-bold mb-2">Custo Previsto (Base)</p>
@@ -1049,13 +995,11 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                                     )}
                                 </div>
                             </div>
-
                             <div className="bg-insanus-panel p-6 rounded-xl border border-gray-800">
                                 <p className="text-sm text-gray-400 uppercase font-bold mb-2">Custo Mensal (Atual)</p>
                                 <p className="text-3xl font-bold text-blue-400">{formatCurrency(projectedCost / 3)}</p> 
                                 <p className="text-xs text-gray-500 mt-2">* Média estimada (rateio)</p>
                             </div>
-
                             <div className="bg-insanus-panel p-6 rounded-xl border border-gray-800">
                                 <p className="text-sm text-gray-400 uppercase font-bold mb-2">Estrutura de Comissão</p>
                                 <ul className="space-y-2 text-sm">
@@ -1074,7 +1018,6 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                                 </ul>
                             </div>
                         </div>
-
                         {costAdditional > 0 && (
                             <div className="bg-red-900/10 border border-red-900 p-4 rounded-xl flex items-center gap-4">
                                 <AlertTriangle className="text-red-500" size={32} />
@@ -1090,7 +1033,7 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                     </div>
                 )}
                 
-                {/* NEW ITEM MODAL (Inside Presential Detail Context) */}
+                {/* NEW ITEM MODAL (Discipline/Topic/Module) */}
                 {newItemModal.open && (
                     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                         <div className="bg-insanus-panel border border-gray-700 rounded-xl w-full max-w-sm p-6 shadow-2xl">
@@ -1116,12 +1059,204 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                         </div>
                     </div>
                 )}
+
+                {/* EDIT COURSE INFO MODAL */}
+                {isEditInfoModalOpen && (
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+                        <div className="bg-insanus-panel border border-gray-700 rounded-xl w-full max-w-4xl shadow-2xl my-8 flex flex-col max-h-[90vh]">
+                            <div className="p-6 border-b border-gray-700 flex justify-between items-center sticky top-0 bg-insanus-panel z-10">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Edit className="text-insanus-red" /> Editar Configurações da Turma
+                                </h3>
+                                <button onClick={() => setIsEditInfoModalOpen(false)} className="text-gray-400 hover:text-white"><X /></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto space-y-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="col-span-2">
+                                        <label className="text-xs text-gray-400 uppercase font-bold block mb-2">Nome do Projeto</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:border-insanus-red outline-none"
+                                            value={localCourse.name}
+                                            onChange={(e) => setLocalCourse(prev => ({...prev, name: e.target.value}))}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-400 uppercase font-bold block mb-2">Categoria</label>
+                                        <select 
+                                            className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white"
+                                            value={localCourse.category}
+                                            onChange={(e) => setLocalCourse(prev => ({...prev, category: e.target.value as CourseCategory}))}
+                                        >
+                                            <option value="CONCURSO">Concurso Público</option>
+                                            <option value="ENEM">ENEM</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-8">
+                                    <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
+                                        <h4 className="text-green-500 font-bold mb-4 flex items-center gap-2"><MapPin size={16}/> Configurações de Polo</h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Localidade</label>
+                                                <select className="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm"
+                                                    value={cfg.location}
+                                                    onChange={(e) => updateLocalConfig('location', e.target.value)}
+                                                >
+                                                    <option value="RIO_BRANCO">Rio Branco</option>
+                                                    <option value="PORTO_VELHO">Porto Velho</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Sub-tipo</label>
+                                                <select className="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm"
+                                                    value={cfg.subType}
+                                                    onChange={(e) => updateLocalConfig('subType', e.target.value)}
+                                                >
+                                                    <option value="PRE_EDITAL">Pré-Edital</option>
+                                                    <option value="POS_EDITAL">Pós-Edital</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Modalidade</label>
+                                                <select className="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm"
+                                                    value={cfg.modality}
+                                                    onChange={(e) => updateLocalConfig('modality', e.target.value)}
+                                                >
+                                                    <option value="REGULAR">Regular</option>
+                                                    <option value="INTENSIVO">Intensivo</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 flex items-center gap-3">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={cfg.hasClassroomRecording}
+                                                onChange={(e) => updateLocalConfig('hasClassroomRecording', e.target.checked)}
+                                                className="w-4 h-4 accent-green-500"
+                                            />
+                                            <span className="text-sm text-white">Haverá gravação da sala de aula?</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
+                                        <h4 className="text-blue-400 font-bold mb-4 flex items-center gap-2"><Clock size={16}/> Estrutura da Turma</h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Total Encontros</label>
+                                                <input type="number" className="w-full bg-black border border-gray-700 rounded p-2 text-white" 
+                                                    value={cfg.totalMeetings}
+                                                    onChange={(e) => updateLocalConfig('totalMeetings', parseInt(e.target.value))}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Duração Encontro (h)</label>
+                                                <input type="number" className="w-full bg-black border border-gray-700 rounded p-2 text-white" 
+                                                    value={cfg.meetingDurationHours}
+                                                    onChange={(e) => updateLocalConfig('meetingDurationHours', parseFloat(e.target.value))}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Aulas/Encontro</label>
+                                                <input type="number" className="w-full bg-black border border-gray-700 rounded p-2 text-white" 
+                                                    value={cfg.classesPerMeeting}
+                                                    onChange={(e) => updateLocalConfig('classesPerMeeting', parseInt(e.target.value))}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Início (Horário)</label>
+                                                <input type="time" className="w-full bg-black border border-gray-700 rounded p-2 text-white" 
+                                                    value={cfg.startTime}
+                                                    onChange={(e) => updateLocalConfig('startTime', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Dias da Semana</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA'].map(day => (
+                                                        <button 
+                                                            key={day}
+                                                            className={`px-2 py-1 text-[10px] rounded border ${cfg.daysOfWeek.includes(day as DayOfWeek) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-700 text-gray-500'}`}
+                                                            onClick={() => {
+                                                                const current = cfg.daysOfWeek;
+                                                                const updated = current.includes(day as DayOfWeek) ? current.filter(d => d !== day) : [...current, day as DayOfWeek];
+                                                                updateLocalConfig('daysOfWeek', updated);
+                                                            }}
+                                                        >
+                                                            {day.substring(0,3)}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2 justify-center">
+                                                <label className="flex items-center gap-2 text-xs">
+                                                    <input type="checkbox" checked={cfg.allowWeekend} onChange={e => updateLocalConfig('allowWeekend', e.target.checked)} className="accent-blue-500" />
+                                                    Usar Fim de Semana (Reserva)
+                                                </label>
+                                                <label className="flex items-center gap-2 text-xs">
+                                                    <input type="checkbox" checked={cfg.skipRedHolidays} onChange={e => updateLocalConfig('skipRedHolidays', e.target.checked)} className="accent-blue-500" />
+                                                    Pular Feriados (Folga)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
+                                        <h4 className="text-yellow-500 font-bold mb-4 flex items-center gap-2"><DollarSign size={16}/> Remuneração (Hora/Aula)</h4>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Valor Base (R$)</label>
+                                                <input type="number" className="w-full bg-black border border-gray-700 rounded p-2 text-white" 
+                                                    value={cfg.hourlyRate}
+                                                    onChange={(e) => updateLocalConfig('hourlyRate', parseFloat(e.target.value))}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">% Gravação</label>
+                                                <input type="number" className="w-full bg-black border border-gray-700 rounded p-2 text-white" 
+                                                    value={cfg.commissionRecording}
+                                                    onChange={(e) => updateLocalConfig('commissionRecording', parseFloat(e.target.value))}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">% Substituição</label>
+                                                <input type="number" className="w-full bg-black border border-gray-700 rounded p-2 text-white" 
+                                                    value={cfg.commissionSubstitution}
+                                                    onChange={(e) => updateLocalConfig('commissionSubstitution', parseFloat(e.target.value))}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">% Fim de Semana</label>
+                                                <input type="number" className="w-full bg-black border border-gray-700 rounded p-2 text-white" 
+                                                    value={cfg.commissionWeekend}
+                                                    onChange={(e) => updateLocalConfig('commissionWeekend', parseFloat(e.target.value))}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 flex justify-end">
+                                    <button 
+                                        onClick={() => setIsEditInfoModalOpen(false)}
+                                        className="bg-insanus-red hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold"
+                                    >
+                                        Concluir Edição
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
              </div>
         </div>
     );
 };
 
-// 4. Online Course Detail View (MISSING IN PREVIOUS VERSION)
+// 4. Online Course Detail View
 const CourseDetail = ({ 
     course, 
     onUpdate, 
@@ -1275,7 +1410,6 @@ const App = () => {
   const [schedule, setSchedule] = useState<ScheduleEvent[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
-  // Modal State
   const [isCreateCourseModalOpen, setIsCreateCourseModalOpen] = useState(false);
   const [creatingCourse, setCreatingCourse] = useState(false);
   const [newCourseData, setNewCourseData] = useState<{
@@ -1290,17 +1424,14 @@ const App = () => {
     presentialConfig: INITIAL_PRESENTIAL_CONFIG
   });
 
-  // Teacher Modal State
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [teacherFormData, setTeacherFormData] = useState<Omit<Teacher, 'id'>>(INITIAL_TEACHER_FORM);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
   const [newSubject, setNewSubject] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
-  // Crop State
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
 
-  // Schedule Modal State
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [newScheduleData, setNewScheduleData] = useState({
       date: '',
@@ -1312,7 +1443,6 @@ const App = () => {
       moduleId: ''
   });
 
-  // Helper to extract derived data for schedule
   const selectedScheduleCourse = courses.find(c => c.id === newScheduleData.courseId);
   const selectedScheduleDiscipline = selectedScheduleCourse?.disciplines.find(d => d.id === newScheduleData.disciplineId);
   const selectedScheduleTopic = selectedScheduleDiscipline?.topics.find(t => t.id === newScheduleData.topicId);
@@ -1320,8 +1450,6 @@ const App = () => {
   
   const selectedTeacher = useMemo(() => {
      if (!selectedScheduleTopic) return null;
-     // Priority: Module assigned teacher -> Topic assigned teacher -> null
-     // Note: `presentialTeacherId` usually used for presential, but we can reuse for online if specific module has teacher
      const tId = selectedScheduleModule?.presentialTeacherId || selectedScheduleTopic.teacherId;
      return teachers.find(t => t.id === tId);
   }, [selectedScheduleTopic, selectedScheduleModule, teachers]);
@@ -1421,7 +1549,6 @@ const App = () => {
           const reader = new FileReader();
           reader.onload = () => {
               setCropImageSrc(reader.result as string);
-              // Clear input to allow re-selecting same file if needed
               e.target.value = '';
           };
           reader.readAsDataURL(file);
@@ -1429,10 +1556,9 @@ const App = () => {
   };
 
   const handleCropComplete = async (blob: Blob) => {
-      setCropImageSrc(null); // Close cropper
+      setCropImageSrc(null); 
       setUploadingAvatar(true);
       try {
-          // Unique filename
           const filename = `avatars/${Date.now()}_cropped.jpg`;
           const storageRef = ref(storage, filename);
           const snapshot = await uploadBytes(storageRef, blob);
@@ -1450,7 +1576,6 @@ const App = () => {
       if (!newScheduleData.date || !newScheduleData.time) return alert("Preencha data e hora");
       if (!newScheduleData.moduleId) return alert("Selecione um módulo");
 
-      // Check Conflict (only if not HOME)
       if (newScheduleData.location !== 'HOME') {
           const conflict = schedule.find(s => 
               s.date === newScheduleData.date && 
@@ -1463,7 +1588,6 @@ const App = () => {
       }
 
       try {
-          // 1. Create Schedule Event
           await addDoc(collection(db, "schedules"), {
               date: newScheduleData.date,
               time: newScheduleData.time,
@@ -1481,7 +1605,6 @@ const App = () => {
               teacherName: selectedTeacher?.name || 'Sem Professor'
           });
 
-          // 2. Update Course Module Status to SCHEDULED
           if (selectedScheduleCourse) {
               const updatedDisciplines = selectedScheduleCourse.disciplines.map(d => {
                   if (d.id === newScheduleData.disciplineId) {
@@ -1613,6 +1736,9 @@ const App = () => {
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.length === 0 && (
+                  <p className="text-gray-500 col-span-full text-center py-10">Nenhuma turma cadastrada. Crie uma nova turma.</p>
+              )}
               {courses.map(course => (
                 <div key={course.id} onClick={() => setSelectedCourse(course)} className="bg-insanus-panel border border-gray-800 p-6 rounded-xl hover:border-insanus-red cursor-pointer group transition-all relative">
                    <div className="flex justify-between items-start mb-4">
@@ -1626,7 +1752,7 @@ const App = () => {
                     )}
                   </div>
                   <h3 className="text-xl font-bold text-white mb-1 group-hover:text-insanus-red transition-colors">{course.name}</h3>
-                  <p className="text-sm text-gray-500 mb-4">{course.category} • {course.disciplines.length} Disciplinas</p>
+                  <p className="text-sm text-gray-500 mb-4">{course.category} • {course.disciplines?.length || 0} Disciplinas</p>
                   
                   {course.presentialSchedule && (
                      <div className="mt-4 pt-4 border-t border-gray-800 flex justify-between items-center text-xs text-gray-400">
@@ -1754,7 +1880,6 @@ const App = () => {
       <main className="flex-1 overflow-hidden relative">
         {renderContent()}
 
-        {/* CROPPER MODAL */}
         {cropImageSrc && (
             <AvatarEditor 
                 imageSrc={cropImageSrc} 
@@ -1763,7 +1888,6 @@ const App = () => {
             />
         )}
         
-        {/* SCHEDULE MODAL */}
         {isScheduleModalOpen && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                 <div className="bg-insanus-panel border border-gray-700 rounded-xl w-full max-w-md p-6 flex flex-col max-h-[90vh]">
@@ -1812,7 +1936,6 @@ const App = () => {
                         <div className="border-t border-gray-700 my-4 pt-4">
                              <label className="text-xs text-insanus-red uppercase font-bold block mb-2">Seleção do Conteúdo (Online)</label>
                              
-                             {/* CASCADE DROPDOWNS */}
                              <div className="space-y-3">
                                 <div>
                                     <label className="text-[10px] text-gray-500 block mb-1">Projeto de Turma</label>
@@ -1904,7 +2027,6 @@ const App = () => {
             </div>
         )}
 
-        {/* CREATE COURSE MODAL */}
          {isCreateCourseModalOpen && (
               <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
                 <div className="bg-insanus-panel border border-gray-700 rounded-xl w-full max-w-4xl shadow-2xl my-8 flex flex-col max-h-[90vh]">
@@ -1916,7 +2038,6 @@ const App = () => {
                   </div>
                   
                   <div className="p-6 overflow-y-auto space-y-8">
-                    {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="col-span-2">
                             <label className="text-xs text-gray-400 uppercase font-bold block mb-2">Nome do Projeto</label>
@@ -1952,11 +2073,9 @@ const App = () => {
                         </div>
                     </div>
 
-                    {/* PRESENCIAL SPECIFIC CONFIG */}
                     {newCourseData.type === 'PRESENCIAL' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             
-                            {/* Location & Modality */}
                             <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
                                 <h4 className="text-green-500 font-bold mb-4 flex items-center gap-2"><MapPin size={16}/> Configurações de Polo</h4>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -2002,7 +2121,6 @@ const App = () => {
                                 </div>
                             </div>
 
-                            {/* Structure */}
                             <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
                                 <h4 className="text-blue-400 font-bold mb-4 flex items-center gap-2"><Clock size={16}/> Estrutura da Turma</h4>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -2068,7 +2186,6 @@ const App = () => {
                                 </div>
                             </div>
 
-                            {/* Finance */}
                             <div className="bg-black/30 p-4 rounded-xl border border-gray-800">
                                 <h4 className="text-yellow-500 font-bold mb-4 flex items-center gap-2"><DollarSign size={16}/> Remuneração (Hora/Aula)</h4>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -2127,7 +2244,6 @@ const App = () => {
               </div>
             )}
 
-            {/* TEACHER MODAL */}
             {isTeacherModalOpen && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                     <div className="bg-insanus-panel border border-gray-700 rounded-xl w-full max-w-2xl p-6">

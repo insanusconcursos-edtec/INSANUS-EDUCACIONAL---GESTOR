@@ -110,12 +110,12 @@ export interface ModuleIndex {
 
   // Material Control
   pdfStatus: MaterialStatus;
-  linkedPdfId?: string;
+  linkedPdfIds?: string[]; // Changed to array
   pdfNotes?: string;
 
   // Question List Control
   questionStatus: MaterialStatus;
-  linkedQuestionPdfId?: string;
+  linkedQuestionPdfIds?: string[]; // Changed to array
   questionNotes?: string;
 
   // PRESENCIAL SPECIFIC

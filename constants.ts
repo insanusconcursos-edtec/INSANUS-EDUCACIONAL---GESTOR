@@ -1,3 +1,4 @@
+
 import { Course, Teacher, FileNode, ScheduleEvent, PresentialConfig } from './types';
 
 export const INITIAL_TEACHER_FORM: Omit<Teacher, 'id'> = {
@@ -91,8 +92,9 @@ export const INITIAL_COURSES: Course[] = [
                 name: 'Teoria da Crase - Parte 1',
                 videoStatus: 'PENDENTE' as any,
                 pdfStatus: 'CONCLUIDO' as any,
-                linkedPdfId: 'doc2',
-                questionStatus: 'PENDENTE' as any
+                linkedPdfIds: ['doc2'],
+                questionStatus: 'PENDENTE' as any,
+                linkedQuestionPdfIds: []
               }
             ]
           }

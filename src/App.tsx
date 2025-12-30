@@ -675,15 +675,48 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers, files }: P
                 ...d,
                 topics: d.topics.map(t => t.id === topicId ? {
                     ...t,
-                    modules: t.modules.map(m => m.id === moduleId ? {
-                        ...m,
-                        [type === 'MATERIAL' ? 'linkedPdfId' : 'linkedQuestionPdfId']: file.id,
-                        [type === 'MATERIAL' ? 'pdfStatus' : 'questionStatus']: MaterialStatus.CONCLUDED
-                    } : m)
+                    modules: t.modules.map(m => {
+                        if (m.id === moduleId) {
+                            const isMaterial = type === 'MATERIAL';
+                            const idList = isMaterial ? (m.linkedPdfIds || []) : (m.linkedQuestionPdfIds || []);
+                            
+                            if (idList.includes(file.id)) return m;
+
+                            return {
+                                ...m,
+                                [isMaterial ? 'linkedPdfIds' : 'linkedQuestionPdfIds']: [...idList, file.id],
+                                [isMaterial ? 'pdfStatus' : 'questionStatus']: MaterialStatus.CONCLUDED
+                            };
+                        }
+                        return m;
+                    })
                 } : t)
             } : d)
         }));
         setFileSelectModal({ ...fileSelectModal, open: false });
+    };
+
+    const removeLinkedFile = (dId: string, tId: string, mId: string, fileId: string, type: 'MATERIAL' | 'QUESTION') => {
+        setLocalCourse(prev => ({
+            ...prev,
+            disciplines: prev.disciplines.map(d => d.id === dId ? {
+                ...d,
+                topics: d.topics.map(t => t.id === tId ? {
+                    ...t,
+                    modules: t.modules.map(m => {
+                        if (m.id === mId) {
+                            const fieldName = type === 'MATERIAL' ? 'linkedPdfIds' : 'linkedQuestionPdfIds';
+                            const currentList = m[fieldName] || [];
+                            return {
+                                ...m,
+                                [fieldName]: currentList.filter(id => id !== fileId)
+                            };
+                        }
+                        return m;
+                    })
+                } : t)
+            } : d)
+        }));
     };
 
     const deleteDiscipline = (dId: string) => {
@@ -762,7 +795,9 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers, files }: P
                     pdfStatus: MaterialStatus.PENDING,
                     questionStatus: MaterialStatus.PENDING,
                     requiredClasses: 1, 
-                    isSelectedForPresential: false
+                    isSelectedForPresential: false,
+                    linkedPdfIds: [],
+                    linkedQuestionPdfIds: []
                 };
                 setLocalCourse(prev => ({
                     ...prev,
@@ -1017,76 +1052,132 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers, files }: P
                                                                 <p className="text-center text-xs text-gray-600 italic">Nenhum módulo cadastrado neste assunto.</p>
                                                             )}
                                                             {t.modules.map(m => (
-                                                                <div key={m.id} className={`group p-3 rounded border flex items-center justify-between transition-colors ${m.isSelectedForPresential ? 'bg-blue-900/20 border-blue-500/50' : 'bg-black/60 border-gray-800'}`}>
-                                                                    <div className="flex items-center gap-3">
-                                                                        <input 
-                                                                            type="checkbox" 
-                                                                            checked={m.isSelectedForPresential || false}
-                                                                            onChange={(e) => updateModule(d.id, t.id, m.id, { isSelectedForPresential: e.target.checked })}
-                                                                            className="w-5 h-5 accent-insanus-red rounded cursor-pointer"
-                                                                        />
-                                                                        <div>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <p className="text-sm font-bold text-white">{m.name}</p>
-                                                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                    <button 
-                                                                                        onClick={() => openEditModule(d.id, t.id, m.id, m.name)}
-                                                                                        className="text-gray-500 hover:text-blue-400"
-                                                                                        title="Editar Módulo"
-                                                                                    >
-                                                                                        <Edit size={12} />
-                                                                                    </button>
-                                                                                    <button 
-                                                                                        onClick={(e) => { e.stopPropagation(); deleteModule(d.id, t.id, m.id) }}
-                                                                                        className="text-gray-500 hover:text-red-500"
-                                                                                        title="Excluir Módulo"
-                                                                                    >
-                                                                                        <Trash2 size={12} />
-                                                                                    </button>
+                                                                <div key={m.id} className={`group p-3 rounded border flex flex-col gap-2 transition-colors ${m.isSelectedForPresential ? 'bg-blue-900/20 border-blue-500/50' : 'bg-black/60 border-gray-800'}`}>
+                                                                    <div className="flex items-center justify-between w-full">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <input 
+                                                                                type="checkbox" 
+                                                                                checked={m.isSelectedForPresential || false}
+                                                                                onChange={(e) => updateModule(d.id, t.id, m.id, { isSelectedForPresential: e.target.checked })}
+                                                                                className="w-5 h-5 accent-insanus-red rounded cursor-pointer"
+                                                                            />
+                                                                            <div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <p className="text-sm font-bold text-white">{m.name}</p>
+                                                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                        <button 
+                                                                                            onClick={() => openEditModule(d.id, t.id, m.id, m.name)}
+                                                                                            className="text-gray-500 hover:text-blue-400"
+                                                                                            title="Editar Módulo"
+                                                                                        >
+                                                                                            <Edit size={12} />
+                                                                                        </button>
+                                                                                        <button 
+                                                                                            onClick={(e) => { e.stopPropagation(); deleteModule(d.id, t.id, m.id) }}
+                                                                                            className="text-gray-500 hover:text-red-500"
+                                                                                            title="Excluir Módulo"
+                                                                                        >
+                                                                                            <Trash2 size={12} />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2 mt-1">
+                                                                                    <label className="text-[10px] text-gray-400">Qtd. Aulas:</label>
+                                                                                    <input 
+                                                                                        type="number" 
+                                                                                        min="1"
+                                                                                        className="bg-black border border-gray-700 rounded w-12 text-center text-xs text-white"
+                                                                                        value={m.requiredClasses}
+                                                                                        onChange={(e) => updateModule(d.id, t.id, m.id, { requiredClasses: parseInt(e.target.value) || 1 })}
+                                                                                    />
+                                                                                    <span className="text-[10px] text-gray-500">(1 Aula = {((cfg.meetingDurationHours * 60) / cfg.classesPerMeeting)}min)</span>
                                                                                 </div>
                                                                             </div>
-                                                                            <div className="flex items-center gap-2 mt-1">
-                                                                                <label className="text-[10px] text-gray-400">Qtd. Aulas:</label>
-                                                                                <input 
-                                                                                    type="number" 
-                                                                                    min="1"
-                                                                                    className="bg-black border border-gray-700 rounded w-12 text-center text-xs text-white"
-                                                                                    value={m.requiredClasses}
-                                                                                    onChange={(e) => updateModule(d.id, t.id, m.id, { requiredClasses: parseInt(e.target.value) || 1 })}
-                                                                                />
-                                                                                <span className="text-[10px] text-gray-500">(1 Aula = {((cfg.meetingDurationHours * 60) / cfg.classesPerMeeting)}min)</span>
-                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        <div className="flex items-center gap-2">
+                                                                            {/* PDF Link Button */}
+                                                                            <button 
+                                                                                onClick={() => openFileSelection(d.id, t.id, m.id, 'MATERIAL')}
+                                                                                className={`p-1.5 rounded transition-colors ${m.linkedPdfIds && m.linkedPdfIds.length > 0 ? 'text-green-500 bg-green-500/10 hover:bg-green-500/20' : 'text-gray-600 hover:text-gray-400 hover:bg-gray-800'}`}
+                                                                                title="Adicionar Material PDF"
+                                                                            >
+                                                                                <FileText size={16} />
+                                                                            </button>
+
+                                                                            {/* Questions Link Button */}
+                                                                            <button 
+                                                                                onClick={() => openFileSelection(d.id, t.id, m.id, 'QUESTION')}
+                                                                                className={`p-1.5 rounded transition-colors ${m.linkedQuestionPdfIds && m.linkedQuestionPdfIds.length > 0 ? 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20' : 'text-gray-600 hover:text-gray-400 hover:bg-gray-800'}`}
+                                                                                title="Adicionar Lista de Questões"
+                                                                            >
+                                                                                <FileQuestion size={16} />
+                                                                            </button>
+
+                                                                            <select 
+                                                                                className="bg-black border border-gray-700 text-xs text-gray-400 rounded p-1 w-32"
+                                                                                value={m.presentialTeacherId || ''}
+                                                                                onChange={(e) => updateModule(d.id, t.id, m.id, { presentialTeacherId: e.target.value })}
+                                                                            >
+                                                                                <option value="">Professor...</option>
+                                                                                {teachers.map(tr => <option key={tr.id} value={tr.id}>{tr.name}</option>)}
+                                                                            </select>
                                                                         </div>
                                                                     </div>
-                                                                    
-                                                                    <div className="flex items-center gap-2">
-                                                                        {/* PDF Link Button */}
-                                                                        <button 
-                                                                            onClick={() => openFileSelection(d.id, t.id, m.id, 'MATERIAL')}
-                                                                            className={`p-1.5 rounded transition-colors ${m.linkedPdfId ? 'text-green-500 bg-green-500/10 hover:bg-green-500/20' : 'text-gray-600 hover:text-gray-400 hover:bg-gray-800'}`}
-                                                                            title={m.linkedPdfId ? "Material PDF Vinculado (Clique para alterar)" : "Vincular Material PDF"}
-                                                                        >
-                                                                            <FileText size={16} />
-                                                                        </button>
 
-                                                                        {/* Questions Link Button */}
-                                                                        <button 
-                                                                            onClick={() => openFileSelection(d.id, t.id, m.id, 'QUESTION')}
-                                                                            className={`p-1.5 rounded transition-colors ${m.linkedQuestionPdfId ? 'text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20' : 'text-gray-600 hover:text-gray-400 hover:bg-gray-800'}`}
-                                                                            title={m.linkedQuestionPdfId ? "Lista de Questões Vinculada (Clique para alterar)" : "Vincular Lista de Questões"}
-                                                                        >
-                                                                            <FileQuestion size={16} />
-                                                                        </button>
-
-                                                                        <select 
-                                                                            className="bg-black border border-gray-700 text-xs text-gray-400 rounded p-1 w-32"
-                                                                            value={m.presentialTeacherId || ''}
-                                                                            onChange={(e) => updateModule(d.id, t.id, m.id, { presentialTeacherId: e.target.value })}
-                                                                        >
-                                                                            <option value="">Professor...</option>
-                                                                            {teachers.map(tr => <option key={tr.id} value={tr.id}>{tr.name}</option>)}
-                                                                        </select>
-                                                                    </div>
+                                                                    {/* Linked Files Display */}
+                                                                    {(m.linkedPdfIds?.length > 0 || m.linkedQuestionPdfIds?.length > 0) && (
+                                                                        <div className="flex flex-wrap gap-2 ml-8">
+                                                                            {/* Materials */}
+                                                                            {m.linkedPdfIds?.map(fid => {
+                                                                                const file = files.find(f => f.id === fid);
+                                                                                if (!file) return null;
+                                                                                return (
+                                                                                    <div key={fid} className="flex items-center gap-1 bg-green-900/30 border border-green-700/50 text-green-400 text-[10px] px-2 py-0.5 rounded transition-colors hover:bg-green-900/50">
+                                                                                        <div 
+                                                                                            className="flex items-center gap-1 cursor-pointer"
+                                                                                            onClick={() => window.open(file.url, '_blank')}
+                                                                                            title="Abrir PDF"
+                                                                                        >
+                                                                                            <FileText size={10} />
+                                                                                            <span className="max-w-[150px] truncate hover:underline">{file.name}</span>
+                                                                                        </div>
+                                                                                        <button 
+                                                                                            onClick={(e) => { e.stopPropagation(); removeLinkedFile(d.id, t.id, m.id, fid, 'MATERIAL'); }}
+                                                                                            className="hover:text-white ml-1 p-0.5 rounded hover:bg-red-500/20 text-green-600 hover:text-red-400"
+                                                                                            title="Desvincular"
+                                                                                        >
+                                                                                            <X size={10} />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                            {/* Questions */}
+                                                                            {m.linkedQuestionPdfIds?.map(fid => {
+                                                                                const file = files.find(f => f.id === fid);
+                                                                                if (!file) return null;
+                                                                                return (
+                                                                                    <div key={fid} className="flex items-center gap-1 bg-yellow-900/30 border border-yellow-700/50 text-yellow-400 text-[10px] px-2 py-0.5 rounded transition-colors hover:bg-yellow-900/50">
+                                                                                        <div 
+                                                                                            className="flex items-center gap-1 cursor-pointer"
+                                                                                            onClick={() => window.open(file.url, '_blank')}
+                                                                                            title="Abrir Lista de Questões"
+                                                                                        >
+                                                                                            <FileQuestion size={10} />
+                                                                                            <span className="max-w-[150px] truncate hover:underline">{file.name}</span>
+                                                                                        </div>
+                                                                                        <button 
+                                                                                            onClick={(e) => { e.stopPropagation(); removeLinkedFile(d.id, t.id, m.id, fid, 'QUESTION'); }}
+                                                                                            className="hover:text-white ml-1 p-0.5 rounded hover:bg-red-500/20 text-yellow-600 hover:text-red-400"
+                                                                                            title="Desvincular"
+                                                                                        >
+                                                                                            <X size={10} />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             ))}
                                                         </div>

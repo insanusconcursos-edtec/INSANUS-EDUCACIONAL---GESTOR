@@ -87,6 +87,48 @@ const formatWhatsAppLink = (phone: string) => {
 
 // --- COMPONENTS ---
 
+const ConfirmationDialog = ({ open, title, message, onConfirm, onCancel }: { open: boolean; title: string; message: string; onConfirm: () => void; onCancel: () => void; }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="bg-insanus-panel border border-gray-700 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
+        <p className="text-sm text-gray-400 mb-6">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors font-medium">Cancelar</button>
+          <button onClick={onConfirm} className="flex-1 py-2 bg-insanus-red text-white font-bold rounded-lg hover:bg-red-700 transition-colors">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const InputDialog = ({ open, title, initialValue, onConfirm, onCancel }: { open: boolean; title: string; initialValue: string; onConfirm: (val: string) => void; onCancel: () => void; }) => {
+  const [val, setVal] = useState(initialValue);
+  useEffect(() => { setVal(initialValue); }, [open, initialValue]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="bg-insanus-panel border border-gray-700 rounded-xl w-full max-w-sm p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-white mb-4">{title}</h3>
+            <input 
+                autoFocus
+                type="text" 
+                className="w-full bg-black border border-gray-700 rounded p-3 text-white mb-4 outline-none focus:border-insanus-red transition-colors"
+                value={val}
+                onChange={e => setVal(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && onConfirm(val)}
+                placeholder="Digite aqui..."
+            />
+            <div className="flex gap-3">
+                <button onClick={onCancel} className="flex-1 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg font-medium">Cancelar</button>
+                <button onClick={() => onConfirm(val)} className="flex-1 py-2 bg-insanus-red text-white font-bold rounded-lg hover:bg-red-700">Salvar</button>
+            </div>
+        </div>
+    </div>
+  );
+}
+
 // 0. Avatar Editor
 const AvatarEditor = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCancel: () => void, onSave: (blob: Blob) => void }) => {
     const [userZoom, setUserZoom] = useState(1);
@@ -268,6 +310,7 @@ const FileManager = ({ files, onSelectFile }: { files: FileNode[], onSelectFile?
     const [currentPath, setCurrentPath] = useState<string[]>(['root']);
     const [newFolderName, setNewFolderName] = useState('');
     const [uploading, setUploading] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState<{open: boolean, id: string}>({open: false, id: ''});
     
     const currentFolderId = currentPath[currentPath.length - 1];
 
@@ -315,13 +358,14 @@ const FileManager = ({ files, onSelectFile }: { files: FileNode[], onSelectFile?
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (window.confirm('Tem certeza? Isso excluirá o registro do sistema.')) {
+    const confirmDeletion = async () => {
+        if (!confirmDelete.id) return;
         try {
-            await deleteDoc(doc(db, "files", id));
+            await deleteDoc(doc(db, "files", confirmDelete.id));
         } catch (e) {
             alert("Erro ao excluir");
-        }
+        } finally {
+            setConfirmDelete({open: false, id: ''});
         }
     };
 
@@ -339,6 +383,14 @@ const FileManager = ({ files, onSelectFile }: { files: FileNode[], onSelectFile?
 
   return (
     <div className="bg-insanus-panel rounded-xl border border-gray-800 h-full flex flex-col overflow-hidden">
+      <ConfirmationDialog 
+        open={confirmDelete.open} 
+        title="Excluir Arquivo/Pasta" 
+        message="Tem certeza? Isso excluirá o registro permanentemente do sistema." 
+        onConfirm={confirmDeletion} 
+        onCancel={() => setConfirmDelete({open: false, id: ''})} 
+      />
+
       <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-insanus-dark/50">
         <div className="flex items-center gap-2 text-sm text-gray-400">
           {breadcrumbs.map((crumb, idx) => (
@@ -364,7 +416,7 @@ const FileManager = ({ files, onSelectFile }: { files: FileNode[], onSelectFile?
           {currentFiles.map(node => (
             <div key={node.id} className="group relative p-4 rounded-lg border border-gray-800 bg-insanus-black hover:border-insanus-red/50 cursor-pointer flex flex-col items-center gap-2"
               onClick={() => node.type === 'FOLDER' ? setCurrentPath([...currentPath, node.id]) : (onSelectFile ? onSelectFile(node) : window.open(node.url, '_blank'))}>
-              <button onClick={(e) => {e.stopPropagation(); handleDelete(node.id)}} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500"><Trash2 size={14}/></button>
+              <button onClick={(e) => {e.stopPropagation(); setConfirmDelete({open: true, id: node.id})}} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500"><Trash2 size={14}/></button>
               {node.type === 'FOLDER' ? <FolderIcon size={40} className="text-gray-500" /> : <FileIcon size={40} className="text-insanus-red" />}
               <span className="text-xs text-center text-gray-300 truncate w-full">{node.name}</span>
             </div>
@@ -375,7 +427,7 @@ const FileManager = ({ files, onSelectFile }: { files: FileNode[], onSelectFile?
   );
 };
 
-// 3. Presential Course Detail View (WITH ACCORDION & EDIT MODAL)
+// 3. Presential Course Detail View (WITH ACCORDION, EDIT MODAL & DELETE)
 interface PresentialDetailProps {
   course: Course;
   onUpdate: (c: Course) => Promise<void>;
@@ -391,6 +443,7 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
     const [saving, setSaving] = useState(false);
     const [generatingSchedule, setGeneratingSchedule] = useState(false);
     const [isEditInfoModalOpen, setIsEditInfoModalOpen] = useState(false);
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: () => {} });
     
     const cfg = localCourse.presentialConfig || INITIAL_PRESENTIAL_CONFIG;
 
@@ -422,7 +475,18 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
     };
 
     const generateSchedule = async () => {
-        if(!confirm("Isso irá sobrescrever a grade atual. Deseja continuar?")) return;
+        setConfirmDialog({
+            open: true,
+            title: "Gerar Grade Automática",
+            message: "Isso irá sobrescrever a grade atual. Deseja continuar?",
+            onConfirm: () => {
+                setConfirmDialog(prev => ({...prev, open: false}));
+                runScheduleGeneration();
+            }
+        });
+    };
+
+    const runScheduleGeneration = async () => {
         setGeneratingSchedule(true);
 
         const dayMap: Record<string, number> = {
@@ -586,18 +650,58 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
         setNewItemModal({ open: true, mode: 'EDIT', type: 'MODULE', dId, tId, itemId: mId, value: currentName });
     };
 
-    const deleteModule = async (dId: string, tId: string, mId: string) => {
-        if(!confirm("Tem certeza que deseja excluir este módulo?")) return;
-        setLocalCourse(prev => ({
-            ...prev,
-            disciplines: prev.disciplines.map(d => d.id === dId ? {
-                ...d,
-                topics: d.topics.map(t => t.id === tId ? {
-                    ...t,
-                    modules: t.modules.filter(m => m.id !== mId)
-                } : t)
-            } : d)
-        }));
+    const deleteDiscipline = (dId: string) => {
+        setConfirmDialog({
+            open: true,
+            title: "Excluir Disciplina",
+            message: "Tem certeza que deseja excluir esta disciplina e todo seu conteúdo?",
+            onConfirm: () => {
+                setLocalCourse(prev => ({
+                    ...prev,
+                    disciplines: prev.disciplines.filter(d => d.id !== dId)
+                }));
+                setConfirmDialog(prev => ({...prev, open: false}));
+            }
+        });
+    };
+
+    const deleteTopic = (dId: string, tId: string) => {
+        setConfirmDialog({
+            open: true,
+            title: "Excluir Assunto",
+            message: "Tem certeza que deseja excluir este assunto e seus módulos?",
+            onConfirm: () => {
+                setLocalCourse(prev => ({
+                    ...prev,
+                    disciplines: prev.disciplines.map(d => d.id === dId ? {
+                        ...d,
+                        topics: d.topics.filter(t => t.id !== tId)
+                    } : d)
+                }));
+                setConfirmDialog(prev => ({...prev, open: false}));
+            }
+        });
+    };
+
+    const deleteModule = (dId: string, tId: string, mId: string) => {
+        setConfirmDialog({
+            open: true,
+            title: "Excluir Módulo",
+            message: "Tem certeza que deseja excluir este módulo?",
+            onConfirm: () => {
+                setLocalCourse(prev => ({
+                    ...prev,
+                    disciplines: prev.disciplines.map(d => d.id === dId ? {
+                        ...d,
+                        topics: d.topics.map(t => t.id === tId ? {
+                            ...t,
+                            modules: t.modules.filter(m => m.id !== mId)
+                        } : t)
+                    } : d)
+                }));
+                setConfirmDialog(prev => ({...prev, open: false}));
+            }
+        });
     };
 
     const handleConfirmAddItem = () => {
@@ -703,6 +807,14 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
 
     return (
         <div className="h-full flex flex-col bg-insanus-black">
+             <ConfirmationDialog 
+                open={confirmDialog.open} 
+                title={confirmDialog.title} 
+                message={confirmDialog.message} 
+                onConfirm={confirmDialog.onConfirm} 
+                onCancel={() => setConfirmDialog(prev => ({...prev, open: false}))} 
+             />
+
              {/* Header */}
              <div className="p-6 border-b border-gray-800 bg-insanus-dark flex justify-between items-center">
                 <div className="flex items-center gap-4">
@@ -789,6 +901,9 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                                         <button onClick={(e) => {e.stopPropagation(); openAddTopic(d.id)}} className="text-xs bg-black border border-gray-700 hover:border-insanus-red px-3 py-1 rounded text-gray-300">
                                             + Assunto
                                         </button>
+                                        <button onClick={(e) => {e.stopPropagation(); deleteDiscipline(d.id)}} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors" title="Excluir Disciplina">
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 </div>
 
@@ -823,6 +938,13 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                                                         >
                                                             <Edit size={12} />
                                                         </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); deleteTopic(d.id, t.id) }}
+                                                            className="text-gray-500 hover:text-red-500 ml-1"
+                                                            title="Excluir Assunto"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
                                                     </div>
                                                     <button onClick={(e) => { e.stopPropagation(); openAddModule(d.id, t.id) }} className="text-insanus-red text-xs hover:underline">+ Módulo</button>
                                                 </div>
@@ -854,7 +976,7 @@ const PresentialCourseDetail = ({ course, onUpdate, onBack, teachers }: Presenti
                                                                                     <Edit size={12} />
                                                                                 </button>
                                                                                 <button 
-                                                                                    onClick={() => deleteModule(d.id, t.id, m.id)}
+                                                                                    onClick={(e) => { e.stopPropagation(); deleteModule(d.id, t.id, m.id) }}
                                                                                     className="text-gray-500 hover:text-red-500"
                                                                                     title="Excluir Módulo"
                                                                                 >
@@ -1267,57 +1389,80 @@ const CourseDetail = ({
     onBack: () => void
 }) => {
     const [expandedDisciplines, setExpandedDisciplines] = useState<string[]>([]);
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: () => {} });
+    const [inputDialog, setInputDialog] = useState({ open: false, title: '', value: '', onConfirm: (v: string) => {} });
   
     const toggleDiscipline = (id: string) => {
         setExpandedDisciplines(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
   
     const addDiscipline = async () => {
-        const name = prompt("Nome da Disciplina:");
-        if(!name) return;
-        const newD: CourseDiscipline = { id: Date.now().toString(), name, topics: [] };
-        await onUpdate({...course, disciplines: [...course.disciplines, newD]});
+        setInputDialog({
+            open: true,
+            title: "Nome da Disciplina",
+            value: "",
+            onConfirm: async (name) => {
+                if(!name) return;
+                const newD: CourseDiscipline = { id: Date.now().toString(), name, topics: [] };
+                await onUpdate({...course, disciplines: [...course.disciplines, newD]});
+                setInputDialog(prev => ({...prev, open: false}));
+            }
+        });
     };
   
     const addTopic = async (dId: string) => {
-        const name = prompt("Nome do Tópico:");
-        if(!name) return;
-        const updatedDisciplines = course.disciplines.map(d => {
-            if(d.id === dId) {
-                return { ...d, topics: [...d.topics, { id: Date.now().toString(), name, modules: [] }] };
+        setInputDialog({
+            open: true,
+            title: "Nome do Assunto",
+            value: "",
+            onConfirm: async (name) => {
+                if(!name) return;
+                const updatedDisciplines = course.disciplines.map(d => {
+                    if(d.id === dId) {
+                        return { ...d, topics: [...d.topics, { id: Date.now().toString(), name, modules: [] }] };
+                    }
+                    return d;
+                });
+                await onUpdate({...course, disciplines: updatedDisciplines});
+                setInputDialog(prev => ({...prev, open: false}));
             }
-            return d;
         });
-        await onUpdate({...course, disciplines: updatedDisciplines});
     };
   
     const addModule = async (dId: string, tId: string) => {
-        const name = prompt("Nome do Módulo:");
-        if(!name) return;
-        const updatedDisciplines = course.disciplines.map(d => {
-            if(d.id === dId) {
-                return {
-                    ...d,
-                    topics: d.topics.map(t => {
-                        if(t.id === tId) {
-                            return {
-                                ...t,
-                                modules: [...t.modules, {
-                                    id: Date.now().toString(),
-                                    name,
-                                    videoStatus: VideoStatus.PENDING,
-                                    pdfStatus: MaterialStatus.PENDING,
-                                    questionStatus: MaterialStatus.PENDING
-                                }]
-                            };
-                        }
-                        return t;
-                    })
-                };
+        setInputDialog({
+            open: true,
+            title: "Nome do Módulo",
+            value: "",
+            onConfirm: async (name) => {
+                if(!name) return;
+                const updatedDisciplines = course.disciplines.map(d => {
+                    if(d.id === dId) {
+                        return {
+                            ...d,
+                            topics: d.topics.map(t => {
+                                if(t.id === tId) {
+                                    return {
+                                        ...t,
+                                        modules: [...t.modules, {
+                                            id: Date.now().toString(),
+                                            name,
+                                            videoStatus: VideoStatus.PENDING,
+                                            pdfStatus: MaterialStatus.PENDING,
+                                            questionStatus: MaterialStatus.PENDING
+                                        }]
+                                    };
+                                }
+                                return t;
+                            })
+                        };
+                    }
+                    return d;
+                });
+                await onUpdate({...course, disciplines: updatedDisciplines});
+                setInputDialog(prev => ({...prev, open: false}));
             }
-            return d;
         });
-        await onUpdate({...course, disciplines: updatedDisciplines});
     };
   
     const updateModuleStatus = async (dId: string, tId: string, mId: string, field: string, value: any) => {
@@ -1343,9 +1488,81 @@ const CourseDetail = ({
         });
         await onUpdate({...course, disciplines: updatedDisciplines});
     };
+
+    const deleteDiscipline = (dId: string) => {
+        setConfirmDialog({
+            open: true,
+            title: "Excluir Disciplina",
+            message: "Excluir disciplina e todo seu conteúdo?",
+            onConfirm: async () => {
+                const updatedDisciplines = course.disciplines.filter(d => d.id !== dId);
+                await onUpdate({...course, disciplines: updatedDisciplines});
+                setConfirmDialog(prev => ({...prev, open: false}));
+            }
+        });
+    };
+
+    const deleteTopic = (dId: string, tId: string) => {
+        setConfirmDialog({
+            open: true,
+            title: "Excluir Assunto",
+            message: "Excluir assunto e seus módulos?",
+            onConfirm: async () => {
+                const updatedDisciplines = course.disciplines.map(d => {
+                    if(d.id === dId) {
+                        return { ...d, topics: d.topics.filter(t => t.id !== tId) };
+                    }
+                    return d;
+                });
+                await onUpdate({...course, disciplines: updatedDisciplines});
+                setConfirmDialog(prev => ({...prev, open: false}));
+            }
+        });
+    };
+
+    const deleteModule = (dId: string, tId: string, mId: string) => {
+        setConfirmDialog({
+            open: true,
+            title: "Excluir Módulo",
+            message: "Tem certeza que deseja excluir este módulo?",
+            onConfirm: async () => {
+                const updatedDisciplines = course.disciplines.map(d => {
+                    if(d.id === dId) {
+                        return {
+                            ...d,
+                            topics: d.topics.map(t => {
+                                if(t.id === tId) {
+                                    return { ...t, modules: t.modules.filter(m => m.id !== mId) };
+                                }
+                                return t;
+                            })
+                        };
+                    }
+                    return d;
+                });
+                await onUpdate({...course, disciplines: updatedDisciplines});
+                setConfirmDialog(prev => ({...prev, open: false}));
+            }
+        });
+    };
   
     return (
         <div className="h-full flex flex-col bg-insanus-black">
+            <ConfirmationDialog 
+                open={confirmDialog.open}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={() => setConfirmDialog(prev => ({...prev, open: false}))}
+            />
+            <InputDialog 
+                open={inputDialog.open}
+                title={inputDialog.title}
+                initialValue={inputDialog.value}
+                onConfirm={inputDialog.onConfirm}
+                onCancel={() => setInputDialog(prev => ({...prev, open: false}))}
+            />
+
             <div className="p-6 border-b border-gray-800 bg-insanus-dark flex justify-between items-center">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="p-2 hover:bg-gray-800 rounded-full text-white"><ArrowLeft /></button>
@@ -1360,9 +1577,14 @@ const CourseDetail = ({
                                  {expandedDisciplines.includes(d.id) ? <ChevronDown size={20}/> : <ChevronRight size={20} />} 
                                  {d.name}
                              </h3>
-                             <button onClick={(e) => {e.stopPropagation(); addTopic(d.id)}} className="text-xs bg-black border border-gray-700 hover:border-insanus-red px-3 py-1 rounded text-gray-300">
-                                 + Assunto
-                             </button>
+                             <div className="flex items-center gap-2">
+                                <button onClick={(e) => {e.stopPropagation(); addTopic(d.id)}} className="text-xs bg-black border border-gray-700 hover:border-insanus-red px-3 py-1 rounded text-gray-300">
+                                    + Assunto
+                                </button>
+                                <button onClick={(e) => {e.stopPropagation(); deleteDiscipline(d.id)}} className="p-2 text-gray-500 hover:text-red-500" title="Excluir Disciplina">
+                                    <Trash2 size={16} />
+                                </button>
+                             </div>
                          </div>
                          
                          {expandedDisciplines.includes(d.id) && (
@@ -1370,13 +1592,23 @@ const CourseDetail = ({
                                  {d.topics.map(t => (
                                      <div key={t.id} className="pl-4 border-l-2 border-gray-800">
                                          <div className="flex items-center justify-between mb-2">
-                                             <h4 className="font-medium text-gray-200">{t.name}</h4>
+                                             <div className="flex items-center gap-2">
+                                                <h4 className="font-medium text-gray-200">{t.name}</h4>
+                                                <button onClick={() => deleteTopic(d.id, t.id)} className="text-gray-500 hover:text-red-500 ml-2" title="Excluir Assunto">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                             </div>
                                              <button onClick={() => addModule(d.id, t.id)} className="text-insanus-red text-xs hover:underline">+ Módulo</button>
                                          </div>
                                          <div className="space-y-2">
                                              {t.modules.map(m => (
                                                  <div key={m.id} className="bg-black/40 border border-gray-800 rounded p-3 flex items-center justify-between">
-                                                     <span className="text-sm font-medium text-white">{m.name}</span>
+                                                     <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium text-white">{m.name}</span>
+                                                        <button onClick={() => deleteModule(d.id, t.id, m.id)} className="text-gray-600 hover:text-red-500 ml-2" title="Excluir Módulo">
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                     </div>
                                                      <div className="flex gap-4">
                                                          <select 
                                                              value={m.videoStatus}
@@ -1431,6 +1663,7 @@ const App = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [appConfirm, setAppConfirm] = useState({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [newScheduleData, setNewScheduleData] = useState({
@@ -1652,15 +1885,22 @@ const App = () => {
       }
   };
 
-  const handleDeleteCourse = async (id: string) => {
-      if(confirm("Excluir projeto?")) {
-        try {
-          await deleteDoc(doc(db, "courses", id));
-          if(selectedCourse?.id === id) setSelectedCourse(null);
-        } catch (e) {
-          alert("Erro ao excluir");
+  const handleDeleteCourse = (id: string) => {
+      setAppConfirm({
+        open: true,
+        title: "Excluir Projeto de Turma",
+        message: "Tem certeza? Isso apagará todas as disciplinas e agendamentos relacionados.",
+        onConfirm: async () => {
+             try {
+                await deleteDoc(doc(db, "courses", id));
+                if(selectedCourse?.id === id) setSelectedCourse(null);
+            } catch (e) {
+                alert("Erro ao excluir");
+            } finally {
+                setAppConfirm(prev => ({...prev, open: false}));
+            }
         }
-      }
+      });
   };
   
   const handleDuplicateCourse = async (id: string) => {
@@ -1876,6 +2116,14 @@ const App = () => {
 
   return (
     <div className="flex bg-insanus-black min-h-screen text-gray-100 font-sans">
+      <ConfirmationDialog 
+        open={appConfirm.open}
+        title={appConfirm.title}
+        message={appConfirm.message}
+        onConfirm={appConfirm.onConfirm}
+        onCancel={() => setAppConfirm(prev => ({...prev, open: false}))}
+      />
+
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <main className="flex-1 overflow-hidden relative">
         {renderContent()}
